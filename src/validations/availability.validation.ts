@@ -66,3 +66,9 @@ export const updateAvailabilitySchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "endDate cannot be in the past", path: ["endDate"] });
   }
 });
+
+
+export const bulkCreateAvailabilitySchema = z
+  .array(createAvailabilitySchema)
+  .nonempty("At least one availability is required")
+  .max(500, "Max 500 items per request");
