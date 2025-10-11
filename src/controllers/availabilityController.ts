@@ -91,3 +91,20 @@ export const bulkCreateAvailabilities = async (req: Request, res: Response, next
     next(error);
   }
 };
+
+
+export const bulkUpdateAvailabilities = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const mode = String(req.query.mode || "strict").toLowerCase() === "lenient" ? "lenient" : "strict";
+    const result = await availabilityService.bulkUpdateAvailabilities(req.body, { mode });
+    return res.status(200).json(result);
+  } catch (error: any) {
+    if (error instanceof ApiError && error.statusCode === 409) {
+      try {
+        const parsed = JSON.parse(error.message);
+        return res.status(409).json(parsed);
+      } catch { /* fallback */ }
+    }
+    next(error);
+  }
+};
