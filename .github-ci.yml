@@ -1,0 +1,36 @@
+stages:
+  - deploy
+
+variables:
+  SSH_USER: "maframa"
+  SSH_HOST: "192.250.27.23"
+  SSH_KEY_PATH: "~/.ssh/id_rsa"
+  NODE_PATH: "/opt/cpanel/ea-nodejs20/bin"
+  DEV_DIR: "/home/maframa/api_dev_flexitaim_new"
+
+# ============================
+# DEPLOY A DESARROLLO (nuevo backend)
+# ============================
+deploy_dev:
+  stage: deploy
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update -qq && apt-get install -y openssh-client
+    - mkdir -p ~/.ssh
+    - printf "%s\n" "$SSH_PRIVATE_KEY" > $SSH_KEY_PATH
+    - chmod 600 $SSH_KEY_PATH
+    - ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+  script:
+    - echo "🚀 Desplegando NUEVA API en entorno DEV..."
+    - ssh -i $SSH_KEY_PATH -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "
+        cd $DEV_DIR &&
+        echo '📥 Haciendo pull desde rama dev...' &&
+        git pull origin dev &&
+        echo '📦 Instalando dependencias...' &&
+        $NODE_PATH/npm install --production &&
+        echo '♻️ Reiniciando API DEV...' &&
+        touch tmp/restart.txt || mkdir -p tmp && touch tmp/restart.txt &&
+        echo '✅ Deploy DEV completado.'
+      "
+  only:
+    - dev
