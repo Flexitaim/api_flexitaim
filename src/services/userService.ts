@@ -12,6 +12,9 @@ import {
 } from "../utils/pagination";
 import { sendMail } from "../utils/mailerClient";
 import sequelize from "../utils/databaseService";
+import { Service } from "../models/Service";
+import { Appointment } from "../models/Appointment";// ya lo tenías, solo remarco que lo usamos abajo
+
 
 const RESET_TTL_MIN = parseInt(process.env.PASSWORD_RESET_TTL_MINUTES ?? "10", 10);
 
@@ -156,11 +159,63 @@ export const updateUser = async (id: number, data: UpdateUserDto) => {
 };
 
 export const deleteUser = async (id: number) => {
-  const user = await User.findOne({ where: { id, active: true } });
-  if (!user) throw new ApiError("User not found", 404);
-  await user.update({ active: false });
-  return { message: "User disabled successfully" };
+  return await sequelize.transaction(async (t) => {
+    // 1) Tomo el usuario y bloqueo la fila para evitar carreras
+    const user = await User.findOne({
+      where: { id, active: true },
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!user) throw new ApiError("User not found", 404);
+
+    // 2) Desactivo el usuario
+    await user.update({ active: false }, { transaction: t });
+
+    // 3) Desactivo TODOS los servicios del usuario
+    const [servicesDisabled] = await Service.update(
+      { active: false },
+      { where: { userId: id, active: true }, transaction: t }
+    );
+
+    // 4) Busco los IDs de esos servicios (para bajar sus turnos)
+    const ownedServices = await Service.findAll({
+      where: { userId: id }, // ya desactivados arriba; igual sirven sus IDs
+      attributes: ["id"],
+      transaction: t,
+    });
+    const ownedServiceIds = ownedServices.map((s) => s.id);
+
+    // 5) Desactivo turnos donde el usuario aparece como CLIENTE
+    const [appointmentsDisabledAsClient] = await Appointment.update(
+      { active: false },
+      { where: { userId: id, active: true }, transaction: t }
+    );
+
+    // 6) Desactivo turnos de los SERVICIOS del usuario (si tuviera)
+    let appointmentsDisabledAsOwner = 0;
+    if (ownedServiceIds.length > 0) {
+      const [n] = await Appointment.update(
+        { active: false },
+        { where: { serviceId: { [Op.in]: ownedServiceIds }, active: true }, transaction: t }
+      );
+      appointmentsDisabledAsOwner = n;
+    }
+
+    // 7) (Opcional) invalidar tokens de reset pendientes de este usuario
+    await PasswordResetToken.update(
+      { is_used: true },
+      { where: { user_id: id, is_used: false }, transaction: t }
+    );
+
+    return {
+      message: "User disabled successfully",
+      servicesDisabled,
+      appointmentsDisabledAsClient,
+      appointmentsDisabledAsOwner,
+    };
+  });
 };
+
 
 export const getUserByEmailForAuth = async (email: string) => {
   const normalized = email.trim().toLowerCase();
