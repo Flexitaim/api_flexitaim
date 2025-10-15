@@ -93,3 +93,4 @@ export const getAllAppointmentsByUserIdAll = async (req: Request, res: Response,
     next(error);
   }
 };
+
