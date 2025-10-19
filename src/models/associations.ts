@@ -5,6 +5,7 @@ import { Cancellation } from "./Cancellation";
 import { Availability } from "./Availability";
 import { Role } from "./Role";
 import { Payment } from "./Payment";            
+import { Favorite } from "./Favorite";
 
 export const setupAssociations = () => {
   // Client - Service
@@ -30,4 +31,12 @@ export const setupAssociations = () => {
   // User - Payment  (Payment.userId → User.id UUID)
   User.hasMany(Payment, { foreignKey: "userId", as: "payments" });
   Payment.belongsTo(User, { foreignKey: "userId", as: "user" });
+
+  
+  // Favoritos
+  User.hasMany(Favorite, { foreignKey: "userId", as: "favorites", constraints: true });
+  Favorite.belongsTo(User, { foreignKey: "userId", as: "user", constraints: true });
+
+  Service.hasMany(Favorite, { foreignKey: "serviceId", as: "favorites", constraints: true });
+  Favorite.belongsTo(Service, { foreignKey: "serviceId", as: "service", constraints: true });
 };
