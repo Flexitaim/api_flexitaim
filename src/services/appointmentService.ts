@@ -58,12 +58,13 @@ function buildBookedEmailForOwner(args: {
   const when = whenStr(args.date, args.startTime);
   const subject = `🗓️ Nuevo turno confirmado – ${args.serviceName}`;
   const html = `<h2>Hola ${args.ownerName},</h2>
-  <p>Tienes un nuevo turno para <b>${args.serviceName}</b>.</p>
+  <p>Tenés un nuevo turno para <b>${args.serviceName}</b>.</p>
   <ul>
     <li><b>Cliente:</b> ${args.clientName} (${args.clientEmail})</li>
     <li><b>Fecha y hora:</b> ${when}</li>
   </ul>
-  <p>¡Éxitos!</p>`;
+  <p>¡Éxitos!</p>
+  <p>FlexiTaim</p>`;
   const text = `Hola ${args.ownerName},
 Nuevo turno para ${args.serviceName}.
 Cliente: ${args.clientName} (${args.clientEmail})
@@ -82,7 +83,8 @@ function buildCancelEmailForClient(args: {
   const subject = `❌ Cancelación de turno – ${args.serviceName}`;
   const html = `<h2>Hola ${args.clientName},</h2>
   <p>Tu turno para <b>${args.serviceName}</b> fue <b>cancelado por ${args.ownerName}</b>.</p>
-  <p><b>Fecha y hora:</b> ${when}</p>`;
+  <p><b>Fecha y hora:</b> ${when}</p>
+  <p>FlexiTaim</p>`;
   const text = `Hola ${args.clientName},
 Tu turno para ${args.serviceName} fue cancelado por ${args.ownerName}.
 Fecha y hora: ${when}`;
