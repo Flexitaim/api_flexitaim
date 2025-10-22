@@ -9,6 +9,9 @@ import { enableStrictMode } from "./utils/sqlStrictMode";
 import { loadSchemaLimits } from "./utils/schemaLimits";
 import { attachLocalTimes } from "./middlewares/localTime";
 
+// 🧩 Importá la configuración de asociaciones
+import { setupAssociations } from "./models/associations";
+
 import userRouter from "./routes/userRouter";
 import serviceRouter from "./routes/serviceRouter";
 import availabilityRouter from "./routes/availabilityRouter";
@@ -56,14 +59,20 @@ app.use(errorHandler);
 
 async function initServer() {
   try {
+    // 🧱 1️⃣ Inicializá la base de datos y modelos
     await initDatabase();
+
+    // 🔗 2️⃣ Configurá las asociaciones
+    setupAssociations(); // ✅ necesario para evitar el error “User is not associated to Service!”
+
+    // ⚙️ 3️⃣ Activá modo estricto y límites de esquema
     await enableStrictMode();
     await loadSchemaLimits([
       "users","services","appointments","availabilities","cancellations",
       "categories","payments","roles","favorites"
     ]);
 
-    // setupAssociations(); // (dejalo donde lo tenías)
+    // 🚀 4️⃣ Levantá el servidor
     app.listen(port, () => console.log(`⚡️ Server on http://localhost:${port}`));
   } catch (error) {
     console.error(`⚡️ Error al iniciar:`, error);
