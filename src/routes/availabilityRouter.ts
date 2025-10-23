@@ -6,12 +6,16 @@ import {
   createAvailability,
   updateAvailability,
   deleteAvailability,
+  bulkCreateAvailabilities,
+  bulkUpdateAvailabilities
 } from "../controllers/availabilityController";
 import { validate } from "../middlewares/validate";
 import { isAuthenticated } from "../middlewares/isAuthenticated";
 import {
   createAvailabilitySchema,
   updateAvailabilitySchema,
+  bulkCreateAvailabilitySchema,
+  bulkUpdateAvailabilitySchema
 } from "../validations/availability.validation";
 
 const router = Router();
@@ -22,6 +26,17 @@ router.get("/service/:serviceId", isAuthenticated, getAvailabilityByServiceId);
 
 router.post("/", isAuthenticated,validate(createAvailabilitySchema), createAvailability);
 router.put("/:id", isAuthenticated,validate(updateAvailabilitySchema), updateAvailability);
-router.delete("/:id",isAuthenticated, deleteAvailability);
+router.delete("/:id", isAuthenticated, deleteAvailability);
+
+
+// ?mode=strict|lenient  (default: strict)
+router.post("/bulk", validate(bulkCreateAvailabilitySchema), bulkCreateAvailabilities);
+// Bulk UPDATE: ?mode=strict|lenient  (default strict)
+router.put(
+  "/bulk",
+  isAuthenticated,
+  validate(bulkUpdateAvailabilitySchema),
+  bulkUpdateAvailabilities
+);
 
 export default router;
