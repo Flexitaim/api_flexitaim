@@ -8,6 +8,7 @@ import {
   deleteService,
   getServiceLink,
   getServiceByLink,
+  getServiceQrById, 
 } from "../controllers/serviceController";
 import { validate } from "../middlewares/validate";
 import {
@@ -29,6 +30,8 @@ router.get("/:link", isAuthenticated,getServiceByLink);
 
 router.post("/", isAuthenticated,validate(createServiceSchema), createService);
 router.put("/:id", isAuthenticated,validate(updateServiceSchema), updateService);
-router.delete("/:id", isAuthenticated,deleteService);
+router.delete("/:id", isAuthenticated, deleteService);
+
+router.get("/:id/qr", getServiceQrById);
 
 export default router;

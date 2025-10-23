@@ -1,0 +1,30 @@
+name: Deploy Backend API
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configurar SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Desplegar en servidor
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/dev" ]; then
+            echo "=== DEPLOY DEV ==="
+            ssh -o StrictHostKeyChecking=no maframa@192.250.27.23 "cd /home/maframa/api_dev_flexitaim_new && git pull origin dev && npm install --production && /opt/cpanel/ea-nodejs20/bin/npm run build && touch tmp/restart.txt"
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "=== DEPLOY PRODUCCIÓN ==="
+            ssh -o StrictHostKeyChecking=no maframa@192.250.27.23 "cd /home/maframa/api_flexitaim && git pull origin main && npm install --production && /opt/cpanel/ea-nodejs20/bin/npm run build && touch tmp/restart.txt"
+          fi
