@@ -66,3 +66,40 @@ export const updateAvailabilitySchema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "endDate cannot be in the past", path: ["endDate"] });
   }
 });
+
+
+export const bulkCreateAvailabilitySchema = z
+  .array(createAvailabilitySchema)
+  .nonempty("At least one availability is required")
+  .max(500, "Max 500 items per request");
+
+  export const bulkUpdateAvailabilitySchema = z
+  .array(
+    z.object({
+      id: z.number().int().min(1),
+      // mismos campos opcionales del update
+      serviceId: z.number().int().min(1).optional(),
+      dayOfWeek: z.number().int().min(0).max(6).optional(),
+      startTime: z.string().optional(),
+      endTime: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }).superRefine((val, ctx) => {
+      // Reutilizamos las reglas del updateAvailabilitySchema
+      const parsed = updateAvailabilitySchema.safeParse({
+        serviceId: val.serviceId,
+        dayOfWeek: val.dayOfWeek,
+        startTime: val.startTime,
+        endTime: val.endTime,
+        startDate: val.startDate,
+        endDate: val.endDate,
+      });
+      if (!parsed.success) {
+        parsed.error.issues.forEach(issue =>
+          ctx.addIssue({ ...issue, path: [...(issue.path ?? []),] })
+        );
+      }
+    })
+  )
+  .nonempty("At least one update item is required")
+  .max(500, "Max 500 items per request");

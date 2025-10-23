@@ -1,11 +1,18 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { errorHandler } from "./middlewares/errorHandler";
 dotenv.config();
+
+import { errorHandler } from "./middlewares/errorHandler";
 import { initDatabase } from './utils/databaseService';
+import { enableStrictMode } from "./utils/sqlStrictMode";
+import { loadSchemaLimits } from "./utils/schemaLimits";
+import { attachLocalTimes } from "./middlewares/localTime";
+
+// 🧩 Importá la configuración de asociaciones
+import { setupAssociations } from "./models/associations";
+
 import userRouter from "./routes/userRouter";
-import { setupAssociations } from './models/associations';
 import serviceRouter from "./routes/serviceRouter";
 import availabilityRouter from "./routes/availabilityRouter";
 import appointmentRouter from "./routes/appointmentRouter";
@@ -13,26 +20,23 @@ import authRouter from "./routes/authRouter";
 import categoryRouter from "./routes/categoryRouter";
 import roleRouter from "./routes/roleRouter";
 import cancellationRouter from "./routes/cancellationRouter";
+import paymentRouter from "./routes/paymentRouter";
+import favoriteRouter from "./routes/favoriteRouter";
+
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./utils/swagger";
-import paymentRouter from "./routes/paymentRouter";
-import { loadSchemaLimits } from "./utils/schemaLimits";
-import { enableStrictMode } from "./utils/sqlStrictMode";
-import { attachLocalTimes } from "./middlewares/localTime";
 
 const app = express();
-
 const port = process.env.PORT || 10000;
 
-// Middlewares
+// Middlewares “normales”
 app.use(cors());
 app.use(express.json());
-app.use(errorHandler);
+app.use(attachLocalTimes());
 
+// Swagger
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-
-app.use(attachLocalTimes());
 // Rutas
 app.use("/api/users", userRouter);
 app.use("/api/services", serviceRouter);
@@ -43,29 +47,35 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/roles", roleRouter);
 app.use("/api/cancellations", cancellationRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/favorites", favoriteRouter);
+
+// 404 JSON (opcional pero recomendado)
+app.use((req, res) => {
+  res.status(404).json({ message: "Not Found" });
+});
+
+// ⬇️ ¡EL HANDLER DE ERRORES SIEMPRE AL FINAL!
+app.use(errorHandler);
 
 async function initServer() {
   try {
+    // 🧱 1️⃣ Inicializá la base de datos y modelos
     await initDatabase();
+
+    // 🔗 2️⃣ Configurá las asociaciones
+    setupAssociations(); // ✅ necesario para evitar el error “User is not associated to Service!”
+
+    // ⚙️ 3️⃣ Activá modo estricto y límites de esquema
     await enableStrictMode();
     await loadSchemaLimits([
-      "users",
-      "services",
-      "appointments",
-      "availabilities",
-      "cancellations",
-      "categories",
-      "payments",
-      "roles"
+      "users","services","appointments","availabilities","cancellations",
+      "categories","payments","roles","favorites"
     ]);
 
-    setupAssociations();
-
-    app.listen(port, () => {
-      console.log(`⚡️[servidor]: Servidor corriendo en http://localhost:${port}`);
-    });
+    // 🚀 4️⃣ Levantá el servidor
+    app.listen(port, () => console.log(`⚡️ Server on http://localhost:${port}`));
   } catch (error) {
-    console.error(`⚡️[servidor]: Error al iniciar el servidor: ${error}`);
+    console.error(`⚡️ Error al iniciar:`, error);
   }
 }
 

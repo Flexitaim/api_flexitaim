@@ -41,11 +41,16 @@ export const createAppointment = async (req: Request, res: Response, next: NextF
 
 export const updateAppointment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const item = await appointmentService.updateAppointment(parseInt(req.params.id), req.body);
+    // opcional en body: { cancelledBy: "owner" | "client" }
+    const cancelledBy = (req.body?.cancelledBy === "owner" || req.body?.cancelledBy === "client")
+      ? req.body.cancelledBy as "owner" | "client"
+      : undefined;
+
+    const item = await appointmentService.updateAppointment(parseInt(req.params.id), req.body, {
+      actorCancelledBy: cancelledBy
+    });
     res.json(item);
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 export const deleteAppointment = async (req: Request, res: Response, next: NextFunction) => {
@@ -88,3 +93,4 @@ export const getAllAppointmentsByUserIdAll = async (req: Request, res: Response,
     next(error);
   }
 };
+

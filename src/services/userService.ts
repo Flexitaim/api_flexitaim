@@ -12,6 +12,12 @@ import {
 } from "../utils/pagination";
 import { sendMail } from "../utils/mailerClient";
 import sequelize from "../utils/databaseService";
+import { Service } from "../models/Service";
+import { Appointment } from "../models/Appointment";
+import { Status } from "../enums/status.enum";
+import * as appointmentService from "./appointmentService";
+import { Availability } from "../models/Availability";
+
 
 const RESET_TTL_MIN = parseInt(process.env.PASSWORD_RESET_TTL_MINUTES ?? "10", 10);
 
@@ -156,11 +162,122 @@ export const updateUser = async (id: number, data: UpdateUserDto) => {
 };
 
 export const deleteUser = async (id: number) => {
+  // 0) Chequeos
   const user = await User.findOne({ where: { id, active: true } });
   if (!user) throw new ApiError("User not found", 404);
-  await user.update({ active: false });
-  return { message: "User disabled successfully" };
+
+  // 1) Traer servicios activos del usuario (dueño)
+  const services = await Service.findAll({
+    where: { userId: id, active: true },
+    attributes: ["id"],
+  });
+  const ownedServiceIds = services.map(s => s.id);
+
+  // 2) Traer turnos activos donde:
+  //    (a) el usuario es CLIENTE
+  const apptsAsClient = await Appointment.findAll({
+    where: { userId: id, active: true },
+    attributes: ["id", "status"],
+  });
+
+  //    (b) el usuario es DUEÑO del servicio
+  const apptsAsOwner = ownedServiceIds.length
+    ? await Appointment.findAll({
+        where: { serviceId: { [Op.in]: ownedServiceIds }, active: true },
+        attributes: ["id", "status"],
+      })
+    : [];
+
+  // Evitar procesar dos veces el mismo turno (caso extremo: user = owner y client a la vez)
+  const seen = new Set<number>();
+
+  let cancelledByClient = 0;
+  let cancelledByOwner  = 0;
+  let silentlyDisabled  = 0;
+
+  const cancelWithActor = async (apptId: number, actor: "owner" | "client") => {
+    // 1) dispara lógica + emails
+    await appointmentService.updateAppointment(
+      apptId,
+      { status: Status.CANCELLED },
+      { actorCancelledBy: actor }
+    );
+    // 2) y lo bajamos del todo
+    await Appointment.update({ active: false }, { where: { id: apptId } });
+  };
+
+  // 3) Procesar turnos donde el usuario es CLIENTE
+  for (const a of apptsAsClient) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+
+    if (a.status === Status.CONFIRMED) {
+      try {
+        await cancelWithActor(a.id, "client");
+        cancelledByClient++;
+      } catch (e) {
+        console.error("[deleteUser] cancel client appt failed:", e);
+      }
+    } else {
+      // AVAILABLE / CANCELLED / etc. -> solo bajar sin mails
+      await Appointment.update({ active: false }, { where: { id: a.id, active: true } });
+      silentlyDisabled++;
+    }
+  }
+
+  // 4) Procesar turnos de servicios del usuario (DUEÑO)
+  for (const a of apptsAsOwner) {
+    if (seen.has(a.id)) continue;
+    seen.add(a.id);
+
+    if (a.status === Status.CONFIRMED) {
+      try {
+        await cancelWithActor(a.id, "owner");
+        cancelledByOwner++;
+      } catch (e) {
+        console.error("[deleteUser] cancel owner appt failed:", e);
+      }
+    } else {
+      await Appointment.update({ active: false }, { where: { id: a.id, active: true } });
+      silentlyDisabled++;
+    }
+  }
+
+  if (ownedServiceIds.length) {
+  await Availability.update(
+    { active: false },
+    { where: { serviceId: { [Op.in]: ownedServiceIds }, active: true } }
+  );
+  }
+
+  // 5) Ahora sí: desactivar servicios y usuario (atómico)
+  await sequelize.transaction(async (t) => {
+    if (ownedServiceIds.length) {
+      await Service.update(
+        { active: false },
+        { where: { id: { [Op.in]: ownedServiceIds }, active: true }, transaction: t }
+      );
+    }
+
+    await user.update({ active: false }, { transaction: t });
+
+    // (opcional pero recomendado) invalidar tokens de reset pendientes
+    await PasswordResetToken.update(
+      { is_used: true },
+      { where: { user_id: id, is_used: false }, transaction: t }
+    );
+  });
+
+  return {
+    message: "User disabled successfully (with full cancellation logic)",
+    servicesDisabled: ownedServiceIds.length,
+    cancelledByClient,
+    cancelledByOwner,
+    silentlyDisabled, // turnos no confirmados bajados sin mails
+  };
 };
+
+
 
 export const getUserByEmailForAuth = async (email: string) => {
   const normalized = email.trim().toLowerCase();
