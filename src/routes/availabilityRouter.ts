@@ -24,13 +24,13 @@ router.get("/",isAuthenticated, getAllAvailabilities);
 router.get("/:id",isAuthenticated,getAvailabilityById);
 router.get("/service/:serviceId", isAuthenticated, getAvailabilityByServiceId);
 
-router.post("/", isAuthenticated,validate(createAvailabilitySchema), createAvailability);
+//router.post("/", isAuthenticated,validate(createAvailabilitySchema), createAvailability);
 router.put("/:id", isAuthenticated,validate(updateAvailabilitySchema), updateAvailability);
 router.delete("/:id", isAuthenticated, deleteAvailability);
 
 
 // ?mode=strict|lenient  (default: strict)
-router.post("/bulk", validate(bulkCreateAvailabilitySchema), bulkCreateAvailabilities);
+router.post("/", validate(bulkCreateAvailabilitySchema), bulkCreateAvailabilities);
 // Bulk UPDATE: ?mode=strict|lenient  (default strict)
 router.put(
   "/bulk",
