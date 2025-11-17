@@ -63,13 +63,16 @@ export const deleteAppointment = async (req: Request, res: Response, next: NextF
 };
 
 
-export const getAppointmentsByServiceId = async (req: Request, res: Response, next: NextFunction) => {
+
+export const getAppointmentsByServiceId = async (
+  req: Request, res: Response, next: NextFunction
+): Promise<void> => {
   try {
-    const serviceId = parseInt(req.params.serviceId);
-    const list = await appointmentService.getAppointmentsByServiceId(serviceId);
+    const serviceId = Number(req.params.serviceId);
+    const list = await appointmentService.getAppointmentsByServiceId(serviceId, req.user); // <-- solo pasamos req.user
     res.json(list);
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
