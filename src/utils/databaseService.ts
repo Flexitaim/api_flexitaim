@@ -47,8 +47,11 @@ sequelize.addHook("afterConnect", async (connection: any) => {
 export const initDatabase = async () => {
   await sequelize.authenticate();
   await sequelize.query("SET time_zone = '-03:00'"); // para el pool actual
+
   console.log("✅ Conexión OK y time_zone=-03:00 en todas las conexiones");
-  await sequelize.sync({ alter: true });
+
+  // NO crear ni modificar índices
+  await sequelize.sync({ alter: false, force: false });
 };
 
 export default sequelize;
