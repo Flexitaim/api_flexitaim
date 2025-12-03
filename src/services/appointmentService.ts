@@ -312,11 +312,45 @@ export const deleteAppointment = async (id: number) => {
   return { message: "Appointment disabled successfully" };
 };
 
-export const getAppointmentsByServiceId = async (serviceId: number) => {
-  const service = await Service.findOne({ where: { id: serviceId, active: true } });
-  if (!service) {
-    throw new ApiError("Service with the specified id does not exist", 404);
+type AuthLike = {
+  id?: number;           // por si en el futuro usás id
+  userId?: number;       // por si usás userId
+  sub?: string | number; // hoy tu token trae sub (string)
+  roleId?: number;
+  email?: string;
+} | undefined;
+
+function extractUserId(auth: AuthLike): number {
+  const candidate = (auth?.id ?? auth?.userId ?? auth?.sub);
+  const num = typeof candidate === "string" ? Number.parseInt(candidate, 10) : candidate;
+  if (!Number.isFinite(num)) throw new ApiError("Unauthorized", 401);
+  return num as number;
+}
+
+export const getAppointmentsByServiceId = async (
+  serviceId: number,
+  auth: AuthLike
+) => {
+  if (!Number.isFinite(serviceId)) {
+    throw new ApiError("Invalid serviceId", 400);
   }
+
+  // 🔐 sacamos el userId del payload sin tocar tu middleware
+  const requesterUserId = extractUserId(auth);
+
+  // 1) Existe y activo
+  const svc = await Service.findOne({
+    where: { id: serviceId, active: true },
+    attributes: ["id", "userId"],
+  });
+  if (!svc) throw new ApiError("Service with the specified id does not exist", 404);
+
+  // 2) Solo el dueño puede ver los turnos
+  if (svc.userId !== requesterUserId) {
+    throw new ApiError("You are not allowed to view appointments of this service", 403);
+  }
+
+  // 3) Devolver turnos
   return await Appointment.findAll({ where: { serviceId, active: true } });
 };
 
